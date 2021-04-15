@@ -1,0 +1,10 @@
+Requirements:
+
+python-binance
+TA-Lib
+numpy
+websocket_client
+
+
+# 1 - Hook up WSS client to get Binance data
+
