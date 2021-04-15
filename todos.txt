@@ -6,8 +6,17 @@ numpy
 websocket_client
 
 
-# 1 - Hook up WSS client to get Binance data
-# 2 - Buy and sell order logic
-# 3 - Logging for buy and sell
-# 4 - Decide coin pair and timeframe, position sizing
-# 5 - Visualise profits with backtrader
+####### 1 - Hook up WSS client to get Binance data
+####### 2 - Buy and sell order logic
+# Sell 
+- Store buying price into a variable (or can I get from binance api (might be slower?))
+- Store amount that you have 
+- Sell when RSI > RSI_OVERBOUGHT and proft > 15+fees (decide again in step 4)
+
+* No multiple open orders for now
+
+####### 3 - Logging for buy and sell
+####### 4 - Calculate fees and decide taking profit minimum
+####### 5 - Decide coin pair and timeframe, position sizing
+####### 6 - Visualise profits with backtrader
+####### 7 - Modify parameters (70,30) (60,40) to test
