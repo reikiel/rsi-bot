@@ -7,4 +7,7 @@ websocket_client
 
 
 # 1 - Hook up WSS client to get Binance data
-
+# 2 - Buy and sell order logic
+# 3 - Logging for buy and sell
+# 4 - Decide coin pair and timeframe, position sizing
+# 5 - Visualise profits with backtrader
