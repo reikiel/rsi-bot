@@ -16,7 +16,12 @@ websocket_client
 * No multiple open orders for now
 
 ####### 3 - Logging for buy and sell
+- Get order details if successful
 ####### 4 - Calculate fees and decide taking profit minimum
 ####### 5 - Decide coin pair and timeframe, position sizing
 ####### 6 - Visualise profits with backtrader
 ####### 7 - Modify parameters (70,30) (60,40) to test
+####### 8 - Make program to testing in real time but dont buy
+- pretend u buy/sell and log down profit
+
+##### Create test order? try to get response
