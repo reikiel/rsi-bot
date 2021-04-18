@@ -9,11 +9,15 @@ RSI_OVERBOUGHT = 70
 RSI_OVERSOLD = 30
 TRADE_SYMBOL = 'UNIUSDT'
 TRADE_USDT_AMOUNT = 1000
+IN_POSITION_THRESHOLD = 2
 
 closes = []
 in_position = False
 
 client = Client(config.API_KEY, config.API_SECRET)
+
+# Check from binance if in position - this is in case the code gets interrupted
+
 
 def on_open(ws):
   print('connection opened')
@@ -94,7 +98,11 @@ def check_profit_after():
 
 # check how much holdings
 def check_qty():
+  account = client.get_account()
+  print(account)
   return 1
+
+check_qty()
 
 ws = websocket.WebSocketApp(SOCKET, on_open=on_open, on_close=on_close, on_message=on_message)
 ws.run_forever()
