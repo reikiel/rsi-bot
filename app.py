@@ -11,8 +11,10 @@ TRADE_SYMBOL = 'UNIUSDT'
 TRADE_ASSET = 'UNI' # rmb change to uni
 BASE_ASSET = 'USDT'
 TRADE_BASE_AMOUNT = 1000
+BINANCE_FEE = 0.1/100 # 0.1% of the TRADE_ASSET
 
 closes = []
+buy_amt = 1000
 in_position = False
 
 client = Client(config.API_KEY, config.API_SECRET)
@@ -23,18 +25,20 @@ def check_qty(asset):
   return float(balance['free'])
   
 
-# On start, check if in position in case program closes
+# On start, check if in position and the buy_amt in case program closes
 def check_in_position():
-  global in_position
-  if check_qty(TRADE_ASSET) > 2:
+  global in_position, buy_amt
+  if check_qty(TRADE_ASSET) > 5:
     in_position = True
+    # TODO: Check whats the estimated buy amt from previous trades if < TRADE_BASE_AMOUNT
   else:
     in_position = False
+  
 
 check_in_position()
 
 # send order to binance
-# Change all to create_order when done
+# TODO: Change all to create_order when done
 def order(side, qty, symbol, order_type=ORDER_TYPE_MARKET):
   # if sell, sell all qty # of coins => use quantity
   if side == SIDE_SELL:
@@ -43,6 +47,7 @@ def order(side, qty, symbol, order_type=ORDER_TYPE_MARKET):
       symbol=symbol,
       side=side,
       type=ORDER_TYPE_MARKET,
+      newOrderRespType=ORDER_RESP_TYPE_FULL,
       quantity=qty)
       return order
     except Exception as e:
@@ -56,6 +61,7 @@ def order(side, qty, symbol, order_type=ORDER_TYPE_MARKET):
       symbol=symbol,
       side=side,
       type=ORDER_TYPE_MARKET,
+      newOrderRespType=ORDER_RESP_TYPE_FULL,
       quoteOrderQty=qty)
       return order
     except Exception as e:
@@ -64,8 +70,14 @@ def order(side, qty, symbol, order_type=ORDER_TYPE_MARKET):
 
 
 # check profit before selling - estimated profit
-def check_profit_before():
-  return
+# fee is 0.1% of what you use to buy and what you going to receive
+# check how much you going to receive (must current price * holdings)
+def check_profit_before(price, sell_qty):
+  total_from_sale = price * sell_qty
+  est_fee_buy = buy_amt * BINANCE_FEE
+  est_fee_sell = total_from_sale * BINANCE_FEE
+  profit = total_from_sale - est_fee_sell - est_fee_buy
+  return profit
 
 # see profit after selling - real profit accounting for fees
 # can try to get trade history and see how much i buy at, and compare with the current sell order
@@ -73,7 +85,13 @@ def check_profit_before():
 # calculate fill orders
 # then minus TRADE_USDT_AMOUNT
 def check_profit_after(order):
-  return
+  fills = order['fills']
+  total = 0
+  for fill in fills:
+    temp = float(fill['price']) * float(fill['qty']) - float(fill['commission'])
+    total += temp
+  profit = total - buy_amt 
+  return profit
 
 ########################## WebSocket Functions ##########################
 def on_open(ws):
@@ -85,7 +103,7 @@ def on_close(ws):
 
 # whenever websocket gets data
 def on_message(ws, message):
-  global closes
+  global closes, buy_amt
 
   json_message = json.loads(message)
   
@@ -109,17 +127,24 @@ def on_message(ws, message):
         if not in_position:
           print("You are not in position, can't sell")
         else:
-          # TODO: Check profit after fees (before selling)
+          # Check estimated profit after fees, before selling
+          # TODO: Log estimated profit to compare with actual profit
           sell_quantity = check_qty(TRADE_ASSET)
+          est_profit = check_profit_before(float(close), sell_quantity)
           # Sell order logic - check if minimum profit is met
-          print("RSI is overbought and your current balance is profiting. Selling...")
-          order_success = order(SIDE_SELL, sell_quantity, TRADE_SYMBOL)
-          if order_success != False:
-            in_position = False
-            print("SELL order for {} UNI success!".format(sell_quantity))
-            # TODO: Check real profit from order response (after selling)
+          if est_profit > 15:
+            print("RSI is overbought and your current balance is profiting. Selling...")
+            order_success = order(SIDE_SELL, sell_quantity, TRADE_SYMBOL)
+            if order_success != False:
+              in_position = False
+              print("SELL order for {} UNI success!".format(sell_quantity))
+              # Check real profit from order response (after selling)
+              # TODO: Log real profit after selling (in or out of function)
+              act_profit = check_profit_after(order_success)
+            else:
+              print("SELL order not successful, please check what is the problem")
           else:
-            print("SELL order not successful, please check what is the problem")
+            print("RSI is overbought BUT your current balance is not profiting. Hold.")
     
       elif current_rsi < RSI_OVERSOLD:
         if in_position:
