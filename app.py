@@ -1,27 +1,27 @@
-import websocket, json, pprint, talib, numpy, logging
+import websocket, json, pprint, talib, numpy, logging, math
 import config
 from binance.client import Client
 from binance.enums import *
 
-SOCKET = "wss://stream.binance.com:9443/ws/uniusdt@kline_1m"
+SOCKET = "wss://stream.binance.com:9443/ws/xrpusdt@kline_1m"
 RSI_PERIOD = 14
 RSI_OVERBOUGHT = 70
 RSI_OVERSOLD = 30
-TRADE_SYMBOL = 'UNIUSDT'
-TRADE_ASSET = 'UNI' # rmb change to uni
+TRADE_SYMBOL = 'XRPUSDT'
+TRADE_ASSET = 'XRP'
 BASE_ASSET = 'USDT'
-TRADE_BASE_AMOUNT = 1000
+TRADE_BASE_AMOUNT = 500
 BINANCE_FEE = 0.1/100 # 0.1% of the TRADE_ASSET
 
 closes = []
-buy_amt = 1000
+buy_amt = 500
 total_session_profit = 0
 in_position = False
 
 client = Client(config.API_KEY, config.API_SECRET)
 
 # Logging
-logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='a', format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 
 # check how much holdings
 def check_qty(asset):
@@ -32,8 +32,10 @@ def check_qty(asset):
 # On start, check if in position and the buy_amt in case program closes
 def check_in_position():
   global in_position, buy_amt
-  if check_qty(TRADE_ASSET) > 5:
+  checking = check_qty(TRADE_ASSET)
+  if checking > 50:
     in_position = True
+    logging.info("Starting connection and you are in position of {} XRP".format(checking))
     # TODO: Check whats the estimated buy amt from previous trades if < TRADE_BASE_AMOUNT
   else:
     in_position = False
@@ -47,7 +49,7 @@ def order(side, qty, symbol, order_type=ORDER_TYPE_MARKET):
   # if sell, sell all qty # of coins => use quantity
   if side == SIDE_SELL:
     try:
-      order = client.create_test_order(
+      order = client.create_order(
       symbol=symbol,
       side=side,
       type=ORDER_TYPE_MARKET,
@@ -61,7 +63,7 @@ def order(side, qty, symbol, order_type=ORDER_TYPE_MARKET):
   # if buy, buy qty WORTH (USDT) of coin => use quoteOrderQty
   elif side == SIDE_BUY:
     try: 
-      order = client.create_test_order(
+      order = client.create_order(
       symbol=symbol,
       side=side,
       type=ORDER_TYPE_MARKET,
@@ -80,8 +82,8 @@ def check_profit_before(price, sell_qty):
   total_from_sale = price * sell_qty
   est_fee_buy = buy_amt * BINANCE_FEE
   est_fee_sell = total_from_sale * BINANCE_FEE
-  profit = total_from_sale - est_fee_sell - est_fee_buy
-  logging.info("Checking to sell {} UNI for an estimated of ${} profit".format(sell_qty, profit))
+  profit = total_from_sale - est_fee_sell - est_fee_buy - buy_amt
+  logging.info("Checking to sell {} XRP for an estimated of ${} profit".format(sell_qty, profit))
   return profit
 
 # see profit after selling - real profit accounting for fees
@@ -99,7 +101,7 @@ def check_profit_after(order):
     temp = float(fill['price']) * float(fill['qty']) - float(fill['commission'])
     total_money += temp
   profit = total_money - buy_amt 
-  logging.info("Sold {} UNI for a ${} profit".format(total_qty, profit))
+  logging.info("Sold {} XRP for a ${} profit".format(total_qty, profit))
   total_session_profit += profit
   print("Total profit from this session is ${}!".format(total_session_profit))
   return profit
@@ -114,7 +116,7 @@ def on_close(ws):
 
 # whenever websocket gets data
 def on_message(ws, message):
-  global closes, buy_amt
+  global closes, buy_amt, in_position
 
   json_message = json.loads(message)
   
@@ -124,7 +126,7 @@ def on_message(ws, message):
   if is_candle_closed:
     close = candle['c']
     closes.append(float(close))
-    print(closes)
+    # print(closes)
 
     # make sure have 15 closes
     if len(closes) > RSI_PERIOD:
@@ -136,21 +138,22 @@ def on_message(ws, message):
 
       if current_rsi > RSI_OVERBOUGHT:
         logging.info("Current RSI is {}, overbought.".format(current_rsi))
-        print("Current RSI is {}, overbought.")
+        print("Current RSI is {}, overbought.".format(current_rsi))
         if not in_position:
           logging.info("You are not in position, can't sell")
           print("You are not in position, can't sell")
         else:
           # Check estimated profit after fees, before selling
-          sell_quantity = check_qty(TRADE_ASSET)
+          x = check_qty(TRADE_ASSET)
+          sell_quantity = math.floor(x)
           est_profit = check_profit_before(float(close), sell_quantity)
           # Sell order logic - check if minimum profit is met
-          if est_profit > 15:
+          if est_profit > 5:
             print("RSI is overbought and your current balance is profiting. Selling...")
             order_success = order(SIDE_SELL, sell_quantity, TRADE_SYMBOL)
             if order_success != False:
               in_position = False
-              print("SELL order for {} UNI success!".format(sell_quantity))
+              print("SELL order for {} XRP success!".format(sell_quantity))
               # Check real profit from order response (after selling)
               act_profit = check_profit_after(order_success)
             else:
@@ -160,6 +163,7 @@ def on_message(ws, message):
             print("RSI is overbought BUT your current balance is not profiting. Hold.")
     
       elif current_rsi < RSI_OVERSOLD:
+        print("Current RSI is {}, oversold.".format(current_rsi))
         logging.info("Current RSI is {}, oversold.".format(current_rsi))
         if in_position:
           logging.info("You are already in a position, can't buy")
@@ -173,8 +177,8 @@ def on_message(ws, message):
           if order_success != False:
             in_position = True
             buy_quantity = check_qty(TRADE_ASSET)
-            logging.info("Bought {} UNI for ${}".format(buy_quantity, buy_amt))
-            print("BUY order for {} UNI success!".format(buy_quantity))
+            logging.info("Bought {} XRP for ${} at a price of ${} each".format(buy_quantity, buy_amt, close))
+            print("BUY order for {} XRP success!".format(buy_quantity))
           else:
             print("BUY order not successful, please check what is the problem")
 
