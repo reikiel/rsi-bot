@@ -1,41 +1,51 @@
-import config, json, pprint
+import config, json, pprint, math
 from binance.client import Client
 from binance.enums import *
 
 client = Client(config.API_KEY, config.API_SECRET)
 
-# TRADE_SYMBOL = 'UNIUSDT'
+TRADE_SYMBOL = 'XRPUSDT'
+TRADE_ASSET = 'XRP'
 
-# if True:
-#   order = client.create_test_order(
-#     symbol=TRADE_SYMBOL,
-#     side=SIDE_BUY,
-#     type=ORDER_TYPE_MARKET,
-#     newOrderRespType=ORDER_RESP_TYPE_FULL,
-#     quoteOrderQty = 5000)
-#   print(order)
+# check how much holdings
+def check_qty(asset):
+  balance = client.get_asset_balance(asset=asset)
+  return float(balance['free'])
+
+qty = math.floor(check_qty(TRADE_ASSET))
+
+print(math.floor(qty))
+
+
+order = client.create_test_order(
+    symbol=TRADE_SYMBOL,
+    side=SIDE_SELL,
+    type=ORDER_TYPE_MARKET,
+    newOrderRespType=ORDER_RESP_TYPE_FULL,
+    quantity=qty)
+print(order)
 
 # print(1)
 
 # testing function scope
-test = 10
-def testing():
-  global test
-  print(test)
-  test=2
+# test = 10
+# def testing():
+#   global test
+#   print(test)
+#   test=2
 
 # test = 10
-testing()
-print(test)
+# testing()
+# print(test)
 
 
 # test get historical trades
 # quoteQty is the amount u spent in total!
 # need to figure out which ones is the same trade, to get the total buy price?
-trades = client.get_my_trades(symbol="ANKRUSDT", fromId=17808115)
+# trades = client.get_my_trades(symbol="ANKRUSDT", fromId=17808115)
 
-for trade in trades:
-  pprint.pprint(trade)
+# for trade in trades:
+#   pprint.pprint(trade)
 
 # print(client.get_asset_balance(asset="USDT")['free'])
 
